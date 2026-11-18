@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PathSnap – Evaluator UI</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; display: flex; height: 100vh; color: #1d2433; }
+  #side { width: 340px; padding: 16px; background: #f5f7fb; border-right: 1px solid #dde3ee; overflow-y: auto; }
+  #map { flex: 1; }
+  h1 { font-size: 20px; margin: 0 0 2px; }
+  .sub { font-size: 12px; color: #6b7487; margin-bottom: 14px; }
+  label { font-size: 12px; font-weight: 600; color: #4a5368; }
+  input { width: 100%; padding: 7px 9px; border: 1px solid #c8d0de; border-radius: 6px; margin: 4px 0 8px; font-size: 13px; }
+  button { cursor: pointer; border: none; border-radius: 6px; font-size: 13px; }
+  #connect { width: 100%; padding: 8px; background: #1f4fd8; color: white; font-weight: 600; }
+  #status { font-size: 12px; margin: 8px 0 12px; }
+  .ok { color: #1e8e3e; } .err { color: #c5221f; }
+  #trips { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .trip { padding: 8px; background: white; border: 1px solid #c8d0de; font-family: monospace; font-size: 13px; }
+  .trip:hover { border-color: #1f4fd8; }
+  .trip.active { background: #1f4fd8; color: white; border-color: #1f4fd8; }
+  #metrics { margin-top: 16px; display: none; }
+  .card { background: white; border: 1px solid #dde3ee; border-radius: 8px; padding: 12px; }
+  .big { font-size: 34px; font-weight: 700; color: #1f4fd8; line-height: 1.1; }
+  .row { display: flex; justify-content: space-between; font-size: 13px; padding: 3px 0; border-bottom: 1px dashed #edf0f5; }
+  .row:last-child { border-bottom: none; }
+  .legend { background: white; padding: 8px 10px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,.3); font-size: 12px; line-height: 20px; }
+  .sw { display: inline-block; width: 18px; height: 4px; vertical-align: middle; margin-right: 6px; }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
+  #loading { display: none; font-size: 13px; margin-top: 10px; color: #1f4fd8; }
+</style>
+</head>
+<body>
+<div id="side">
+  <h1>PathSnap</h1>
+  <div class="sub">GPS map-matching &amp; route reconstruction</div>
+
+  <label>API address (Laptop 1)</label>
+  <input id="api" value="http://localhost:8000">
+  <button id="connect">Connect &amp; load trips</button>
+  <div id="status"></div>
+
+  <label>Evaluation trips</label>
+  <div id="trips"></div>
+  <div id="loading">Running pipeline on the server…</div>
+
+  <div id="metrics">
+    <div class="card">
+      <div style="font-size:12px;color:#6b7487;">Top-1 accuracy (trip <span id="m-trip"></span>)</div>
+      <div class="big" id="m-acc">–</div>
+      <div class="row"><span>Decoder</span><b id="m-dec"></b></div>
+      <div class="row"><span>Route continuity</span><b id="m-cont"></b></div>
+      <div class="row"><span>GPS points</span><b id="m-n"></b></div>
+      <div class="row"><span>Points scored</span><b id="m-scored"></b></div>
+      <div class="row"><span>Off-route points (excluded)</span><b id="m-off"></b></div>
+      <div class="row"><span>Predicted route arcs</span><b id="m-arcs"></b></div>
+      <div class="row"><span>Server prediction time</span><b id="m-time"></b></div>
+    </div>
+  </div>
+</div>
+<div id="map"></div>
+
+<script>
+const ESRI = s => `https://server.arcgisonline.com/ArcGIS/rest/services/${s}/MapServer/tile/{z}/{y}/{x}`;
+const base = {
+  "Light gray": L.tileLayer(ESRI("Canvas/World_Light_Gray_Base"), { attribution: "Esri", maxZoom: 19 }),
+  "Satellite": L.tileLayer(ESRI("World_Imagery"), { attribution: "Esri", maxZoom: 19 }),
+  "Street map": L.tileLayer(ESRI("World_Street_Map"), { attribution: "Esri", maxZoom: 19 }),
+};
+const map = L.map("map", { layers: [base["Light gray"]] }).setView([20, 0], 2);
+let overlays = {}, layerCtl = L.control.layers(base, {}, { collapsed: false }).addTo(map);
+
+const legend = L.control({ position: "bottomleft" });
+legend.onAdd = () => {
+  const d = L.DomUtil.create("div", "legend");
+  d.innerHTML = '<b>Legend</b><br>' +
+    '<span class="dot" style="background:#4a90ff"></span>Raw GPS point<br>' +
+    '<span class="sw" style="background:#e8453c;height:5px"></span>Predicted route<br>' +
+    '<span class="dot" style="background:#ff9f1c"></span>Snapped position<br>' +
+    '<span class="sw" style="background:#999;height:1px"></span>GPS → snapped offset';
+  return d;
+};
+legend.addTo(map);
+
+const $ = id => document.getElementById(id);
+const apiBase = () => $("api").value.replace(/\/+$/, "");
+
+$("connect").onclick = async () => {
+  $("status").textContent = "Connecting…"; $("status").className = "";
+  try {
+    const h = await (await fetch(apiBase() + "/health")).json();
+    const t = await (await fetch(apiBase() + "/trips")).json();
+    $("status").textContent = `Connected · model ${h.model} · decoder ${h.decoder}`;
+    $("status").className = "ok";
+    $("trips").innerHTML = "";
+    t.trips.forEach(id => {
+      const b = document.createElement("button");
+      b.className = "trip"; b.textContent = id;
+      b.onclick = () => runTrip(id, b);
+      $("trips").appendChild(b);
+    });
+  } catch (e) {
+    $("status").textContent = "Cannot reach API: " + e.message; $("status").className = "err";
+  }
+};
+
+async function runTrip(id, btn) {
+  document.querySelectorAll(".trip").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  $("loading").style.display = "block";
+  try {
+    const r = await fetch(apiBase() + "/predict/" + id);
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    draw(await r.json());
+  } catch (e) {
+    $("status").textContent = "Prediction failed: " + e.message; $("status").className = "err";
+  } finally {
+    $("loading").style.display = "none";
+  }
+}
+
+function draw(res) {
+  Object.values(overlays).forEach(l => { map.removeLayer(l); layerCtl.removeLayer(l); });
+  overlays = {};
+
+  const offsets = L.layerGroup(), snapped = L.layerGroup(), gps = L.layerGroup();
+  res.gps.forEach((p, i) => {
+    L.circleMarker(p, { radius: 3, color: "#1f4fd8", weight: 1, fillColor: "#4a90ff", fillOpacity: 0.9 })
+      .bindTooltip("GPS point " + i).addTo(gps);
+    const s = res.snapped[i];
+    if (s) {
+      L.polyline([p, s], { color: "#999", weight: 1, opacity: 0.7 }).addTo(offsets);
+      L.circleMarker(s, { radius: 2, color: "#ff9f1c", fillOpacity: 1 }).addTo(snapped);
+    }
+  });
+  const route = L.layerGroup();
+  res.route_segments.forEach(seg => L.polyline(seg, { color: "#e8453c", weight: 5, opacity: 0.85 }).addTo(route));
+
+  overlays = { "Predicted route": route, "GPS → snapped offset": offsets, "Snapped positions": snapped, "Raw GPS": gps };
+  Object.entries(overlays).forEach(([name, l]) => { l.addTo(map); layerCtl.addOverlay(l, name); });
+  map.fitBounds(L.latLngBounds(res.gps), { padding: [30, 30] });
+
+  const m = res.metrics, pct = v => (v === null || isNaN(v)) ? "n/a" : (100 * v).toFixed(2) + " %";
+  $("metrics").style.display = "block";
+  $("m-trip").textContent = res.trip_id;
+  $("m-acc").textContent = pct(m.top1_accuracy);
+  $("m-dec").textContent = res.decoder;
+  $("m-cont").textContent = pct(m.route_continuity);
+  $("m-n").textContent = m.n_points;
+  $("m-scored").textContent = m.n_points_scored;
+  $("m-off").textContent = m.n_points_off_route;
+  $("m-arcs").textContent = res.n_route_arcs;
+  $("m-time").textContent = m.prediction_time_s + " s";
+}
+</script>
+</body>
+</html>

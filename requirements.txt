@@ -1,6 +1,9 @@
 numpy
 pandas
+scipy
 scikit-learn
+pyarrow
+joblib
 matplotlib
 seaborn
 folium
@@ -9,4 +12,3 @@ pyproj
 optuna
 fastapi
 uvicorn
-joblib
