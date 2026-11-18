@@ -1,0 +1,12 @@
+model,family,config,cv_macro_f1,cv_std,test_top1_acc,test_macro_f1,test_precision,test_recall,test_log_loss,route_continuity,train_time_s,inference_ms_per_point
+LogisticRegression,Linear,"StandardScaler + LR, C=1, class_weight=balanced",0.8705,0.018,0.8509,0.8698,0.833,0.9272,0.2047,0.9196,5.1,0.001
+GaussianNB,Probabilistic,default (var_smoothing=1e-9),0.7986,0.0149,0.8284,0.7979,0.7592,0.8928,0.5774,0.9065,0.4,0.002
+DecisionTree,Tree,"max_depth=12, min_samples_leaf=50, class_weight=balanced",0.877,0.0183,0.8502,0.8824,0.849,0.9304,0.1853,0.9142,20.3,0.0015
+RandomForest,Ensemble (bagging),"100 trees, max_depth=16, min_samples_leaf=20, max_samples=0.3, class_weight=balanced",0.8908,0.0193,0.8493,0.8926,0.862,0.9343,0.1613,0.9152,182.5,0.0749
+HistGradientBoosting,Boosting,"max_iter=300, learning_rate=0.1, max_leaf_nodes=31, early_stopping, class_weight=balanced",0.8865,0.0194,0.8506,0.8847,0.8504,0.9342,0.1748,0.9139,23.8,0.0725
+KNN,Instance-based,"StandardScaler + k=25, distance-weighted",0.9012,0.0168,0.8492,0.9084,0.9131,0.9039,0.1642,0.9136,5.1,2.0289
+MLP,Neural network,"StandardScaler + hidden (64, 32), ReLU, Adam, batch 2048, early stopping",0.9028,0.0173,0.85,0.9095,0.9157,0.9036,0.117,0.916,138.8,0.0059
+HistGradientBoosting_ctx,Boosting,same as before + 6 context features,0.9256,0.0134,0.8898,0.9152,0.8847,0.9554,0.1213,0.9543,25.6,0.0636
+LogisticRegression_ctx,Linear,same as before + 6 context features,0.9049,0.0089,0.881,0.8961,0.862,0.9445,0.1573,0.9508,5.8,0.0013
+MLP_ctx,Neural network,"hidden (64, 32), Adam, batch 2048, early stopping, max_iter=100",0.935,0.0098,0.8922,0.9337,0.9376,0.9299,0.081,0.9601,367.6,0.0073
+MLP_ctx_tuned,Neural network,"Optuna best: {'units1': 128, 'units2': 64, 'activation': 'tanh', 'alpha': 2.9204338471814107e-05, 'lr': 0.000816845589476017, 'batch_size': 1024}",0.9353,0.0099,0.8921,0.9325,0.9331,0.9319,0.0846,0.9573,698.7,0.0359
