@@ -1,0 +1,5 @@
+{
+  "data_dir": "data/evaluator_test",
+  "model_path": "models/final_model.joblib",
+  "use_hmm": true
+}
