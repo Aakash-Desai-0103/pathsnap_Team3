@@ -19,7 +19,7 @@ HMM + Viterbi decoder to reconstruct a connected route. The system runs as a Fas
 ## Repository structure
 | Folder | Contents |
 |---|---|
-| `notebooks/` | `01_eda.ipynb` (EDA, preprocessing, labels, candidates, features), `02_model_experiments.ipynb` (model comparison, Bayesian optimisation), `03_hmm_viterbi.ipynb` (HMM vs classifier only) |
+| `notebooks/` | `01_eda.ipynb` (EDA, preprocessing, labels, candidates, features), `02_model_experiments.ipynb` (model comparison, Bayesian optimisation), `03_hmm_viterbi.ipynb` (HMM vs classifier only), `04_report_figures.ipynb` (MLP training curves, confusion matrix, Folium map with predicted route) |
 | `src/` | `pipeline.py` (prediction pipeline: preprocessing, candidates, features; never reads `.route`), `hmm.py` (HMM + Viterbi decoder), `scoring.py` (server-side scoring, the only code that reads `.route`) |
 | `api/` | `main.py` (FastAPI: `/health`, `/trips`, `/predict/{trip_id}`), `config.json` |
 | `ui/` | `index.html` (evaluator interface, Leaflet map) |
