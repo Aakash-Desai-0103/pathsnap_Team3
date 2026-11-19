@@ -1,10 +1,20 @@
 # PathSnap: Map-Matching & Route Reconstruction
 UE24CS352A Machine Learning Hackathon, PES University (Team 3)
 
+## Team 3
+| Name | SRN |
+|---|---|
+| Aadya Santhosh | PES1UG24CS005 |
+| Aakash Desai | PES1UG24CS006 |
+| Akanksha Parashuram | PES1UG25CS801 |
+| Piya Banerjee | PES1UG25CS830 |
+
 PathSnap matches noisy GPS observations to a road network. For every GPS point it generates
 nearby candidate road arcs, scores each candidate with a trained classifier, and uses an
 HMM + Viterbi decoder to reconstruct a connected route. The system runs as a FastAPI backend
 (Laptop 1) and a browser UI (Laptop 2).
+
+**Final result: 94.5% Top-1 accuracy on the 10 evaluator trips** (92.6% on student_test).
 
 ## Repository structure
 | Folder | Contents |
@@ -14,8 +24,11 @@ HMM + Viterbi decoder to reconstruct a connected route. The system runs as a Fas
 | `api/` | `main.py` (FastAPI: `/health`, `/trips`, `/predict/{trip_id}`), `config.json` |
 | `ui/` | `index.html` (evaluator interface, Leaflet map) |
 | `models/` | `final_model.joblib` (final classifier: MLP with 15 features) |
-| `results/` | experiment logs, metrics tables, plots |
-| `maps/` | Folium maps |
+| `results/` | experiment logs and metrics tables (CSV), EDA and feature plots |
+| `results/figures/` | report figures: model comparisons, MLP training curves, confusion matrix, tuned vs untuned, classifier vs HMM, evaluator results |
+| `results/screenshots/` | working UI, UI with predicted route and metrics, API terminal log, API health response, Folium map |
+| `maps/` | Folium maps: `map_train_00000001.html` (GPS, road network, reference route), `fig9_map_pred_00000040.html` (adds the predicted route) |
+| `report/` | technical report (PDF) |
 | `Manuals/` | hackathon guideline documents |
 | `data/` | raw trips (not committed; see below) |
 
@@ -55,9 +68,9 @@ Every request is logged in the Laptop 1 terminal.
 - **Labels:** monotone dynamic-programming alignment of GPS points to the ordered reference route; points > 50 m from the route are flagged and excluded.
 - **Candidates:** KD-tree over arcs densified every 10 m; R = 50 m, K = 10 (candidate miss rate 0.66%).
 - **Features:** 9 base features (distance, rank, heading difference, projection position, ...) + 6 context features (distance to neighbouring GPS points, 6 s heading).
-- **Models:** 7 algorithm families compared with GroupKFold-by-trip CV; final model MLP (15 features).
-- **Bayesian optimisation:** Optuna (TPE + median pruning), 20 trials.
-- **HMM + Viterbi:** states = candidate arcs; emissions = classifier probabilities; transitions = road connectivity and distance consistency, with U-turn and jump penalties.
+- **Models:** 7 algorithm families compared with 5-fold GroupKFold-by-trip CV; final model MLP (15 features).
+- **Bayesian optimisation:** Optuna (TPE + median pruning), 20 trials (7 completed, 13 pruned), 3-fold grouped CV; the tuned model did not improve student_test, so the untuned configuration was kept.
+- **HMM + Viterbi:** states = candidate arcs; emissions = classifier probabilities; transitions = road connectivity and distance consistency, with U-turn and jump penalties. Parameters (beta = 10 m, jump = -20, U-turn = -8) chosen by a 12-combination grid on student_test.
 
 ## Results
 | Stage | Top-1 accuracy |
@@ -68,7 +81,7 @@ Every request is logged in the Laptop 1 terminal.
 | MLP + context + HMM, student_test | 92.6% |
 | **Final system on the 10 evaluator trips** | **94.5%** |
 
-Detailed tables are in `results/`.
+Detailed tables are in `results/`, figures in `results/figures/`, and the full write-up in `report/`.
 
 ## AI Assistance Disclosure
 AI tools (Claude) were used for guidance and code assistance. All experiments were run and analysed by the team.
